@@ -7,11 +7,20 @@ const qrcode = require("qrcode");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const amqp = require('amqplib');
-
+const { signupSchema,
+  signinSchema,
+  sendOTPSchema,
+  verifyOTPSchema,
+  totpSetupSchema,
+  validateInvitationSchema } = require("../validators/authValidator");
 
 //signup
 async function signup(req, res) {
   try {
+    const parsed = signupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ errors: parsed.error.errors });
+    }
     const {
       name,
       email,
@@ -21,7 +30,7 @@ async function signup(req, res) {
       mfaMethod,
       invitationId,
       code,
-    } = req.body;
+    } = parsed.data;
     if (invitationId && code) {
       const inv = await invitationService.validateInvitation(invitationId, code);
 
@@ -75,8 +84,11 @@ async function signup(req, res) {
 }
 
 async function signin(req, res) {
+
   try {
-    const { email, password, otp } = req.body;
+    const parsed = signinSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+    const { email, password, otp } = parsed.data;
     if (!email || !password)
       return res.status(400).json({ error: "Email and password required" });
 
@@ -169,7 +181,9 @@ async function loginTOTP(req, res) {
 
 async function totpSetup(req, res) {
   try {
-    const { email } = req.body;
+    const parsed = totpSetupSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+    const { email } = parsed.data;
 
     if (!email) return res.status(400).json({ error: "Email is required." });
 
@@ -321,7 +335,10 @@ async function generateOTP(email) {
 
 async function sendOTP(req, res) {
   try {
-    const { email } = req.body;
+    const parsed = sendOTPSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+
+    const { email } = parsed.data;
     if (!email) return res.status(400).json({ message: "Email required" });
 
     const connection = await amqp.connect(process.env.RABBITMQ_URL);
@@ -360,7 +377,10 @@ async function sendOTP(req, res) {
 }
 
 async function verifyOTP(req, res) {
-  const { email, otp } = req.body;
+  const parsed = verifyOTPSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+
+  const { email, otp } = parsed.data;
   if (!email || !otp) return res.status(400).json({ message: "Email and OTP required" });
 
   const record = global.otpStore?.[email];
@@ -374,7 +394,10 @@ async function verifyOTP(req, res) {
 
 async function validateInvitation(req, res) {
   try {
-    const { invitationId, code } = req.query;
+    const parsed = validateInvitationSchema.safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+
+    const { invitationId, code } = parsed.data;
     const inv = await invitationService.validateInvitation(invitationId, code);
 
     return res.json({
