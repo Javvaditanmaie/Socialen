@@ -8,17 +8,14 @@ const invitationSchema = new mongoose.Schema({
     type: String, 
     required: true,
     enum: ['super_admin', 'site_admin', 'operator', 'client_admin', 'client_user']
-  }, // role to assign on signup
+  }, 
   method: { 
     type: String, 
     enum: ['TOTP','EMAIL_OTP'], 
     default: 'TOTP' 
   },
-  // For EMAIL_OTP
   otpHash: { type: String, select: false, default: null },
   otpExpiresAt: { type: Date, default: null },
-
-  // Status for invitation
   status: {
     type: String,
     enum: ['pending','used','expired'],

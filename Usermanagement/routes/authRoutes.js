@@ -2,10 +2,9 @@ const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/authMiddleware");
 const authController = require("../controllers/authController");
-const { validateSignup, validateLogin } = require("../validators/authValidator");
 
 router.post("/signup", authController.signup);
-router.post("/signin", validateLogin, authController.signin);
+router.post("/signin",  authController.signin);
 router.post("/login-totp", authController.loginTOTP);
 router.post("/refresh", authController.refresh);
 router.post("/logout", authenticate, authController.logout);

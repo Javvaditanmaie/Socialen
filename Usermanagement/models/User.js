@@ -49,7 +49,7 @@ const UserSchema = new mongoose.Schema(
     },
     mfaMethod: {
     type: String,
-    enum: ["none", "totp"],
+    enum: ["none", "totp","otp"],
     default: "none",
   },
     refreshToken: {
