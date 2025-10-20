@@ -49,15 +49,15 @@ const UserSchema = new mongoose.Schema(
     },
     mfaMethod: {
     type: String,
-    enum: ["none", "totp","otp"],
-    default: "none",
+    enum: ["totp","otp"],
+    required:true,
   },
     refreshToken: {
       type: String,
       select: false,
       default: null,
     },
-
+    isVerified: { type: Boolean, default: false },
     totpEnabled: {
       type: Boolean,
       default: false,

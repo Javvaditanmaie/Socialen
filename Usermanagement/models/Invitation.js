@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
 const invitationSchema = new mongoose.Schema({
-  invitationId: { type: String, required: true, unique: true }, // uuid
-  code: { type: String, required: true, unique: true },        // short code
-  email: { type: String, lowercase: true, trim: true },        // optional targeted email
+  invitationId: { type: String, required: true, unique: true }, 
+  code: { type: String, required: true, unique: true },       
+  email: { type: String, lowercase: true, trim: true },       
   role: { 
     type: String, 
     required: true,

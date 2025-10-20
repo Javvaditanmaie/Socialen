@@ -1,10 +1,12 @@
 const authService = require("../services/authService");
 const invitationService = require('../services/invitationService');
 const User = require("../models/User");
+const mongoose = require('mongoose');
 const jwt = require("jsonwebtoken");
 const speakeasy = require("speakeasy");
 const qrcode = require("qrcode");
 const bcrypt = require("bcryptjs");
+const Organization = require("../models/Organization");
 const crypto = require("crypto");
 const amqp = require('amqplib');
 const { signupSchema,
@@ -14,75 +16,88 @@ const { signupSchema,
   totpSetupSchema,
   validateInvitationSchema } = require("../validators/authValidator");
 
-//signup
 async function signup(req, res) {
   try {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ errors: parsed.error.errors });
     }
+
     const {
       name,
       email,
       password,
       role,
-      organizationId,
+      organizationName,
       mfaMethod,
       invitationId,
       code,
     } = parsed.data;
+
     if (invitationId && code) {
       const inv = await invitationService.validateInvitation(invitationId, code);
-
+      const orgId = inv.organizationId || null;
       const user = await authService.registerUser({
         name,
         email: inv.email,
         password,
         role: inv.role,
-        organizationId: inv.organizationId,
-        mfaMethod: inv.method || "totp",
-        createdBy: inv.inviter,
+        organizationId: orgId,
+        mfaMethod: inv.method || mfaMethod || 'otp',
+        createdBy: inv.createdBy || null, 
       });
 
-      await User.findByIdAndUpdate(user._id, { mfaMethod: "totp" });
-
       inv.status = "accepted";
+      inv.acceptedAt = new Date();
+      inv.acceptedUserId = user.id || user._id;
       await inv.save();
+
+      const requiresMfaSetup = user.mfaMethod === 'totp' || user.mfaMethod === 'otp';
       return res.status(201).json({
-        message: "User registered successfully via invitation. Please set up TOTP.",
+        message: `User registered successfully via invitation. Please set up ${inv.method.toUpperCase()}.`,
         requiresMfaSetup: true,
       });
     }
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Name, email, and password required" });
+    if (!name || !email || !password || !role || !mfaMethod) {
+      return res.status(400).json({ error: "Name, email, password, role, and mfaMethod are required" });
     }
-
+    let organizationId = null;
+    if (organizationName) {
+      const normalized = String(organizationName).trim();
+      let org = await Organization.findOne({ name: normalized });
+      if (!org) {
+        const slug = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        org = await Organization.create({ name: normalized, slug });
+      }
+      organizationId = org._id;
+    }
+    
     const user = await authService.registerUser({
       name,
       email,
       password,
       role,
-      organizationId,
-      mfaMethod: mfaMethod || "none",
+      organizationId: organizationId || null,
+      mfaMethod: mfaMethod || 'otp', 
+      createdBy: req.user ? req.user.sub : null,
     });
     if (mfaMethod === "totp") {
       return res.status(201).json({
         message: "User registered successfully. Please set up TOTP.",
         requiresMfaSetup: true,
       });
+    } else if (mfaMethod === "otp") {
+      return res.status(201).json({
+        message: "User registered successfully. OTP will be sent.",
+        requiresVerification: true,
+      });
     }
-
-    return res.status(201).json({
-      message: "User registered successfully.",
-      requiresMfaSetup: false,
-    });
+    
   } catch (err) {
     console.error("Signup Error:", err);
     res.status(500).json({ error: err.message || "Server error" });
   }
 }
-
 async function signin(req, res) {
 
   try {
@@ -377,21 +392,40 @@ async function sendOTP(req, res) {
 }
 
 async function verifyOTP(req, res) {
-  const parsed = verifyOTPSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+  try {
+    const parsed = verifyOTPSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({ errors: parsed.error.errors });
 
-  const { email, otp } = parsed.data;
-  if (!email || !otp) return res.status(400).json({ message: "Email and OTP required" });
+    const { email, otp } = parsed.data;
+    if (!email || !otp)
+      return res.status(400).json({ message: "Email and OTP required" });
 
-  const record = global.otpStore?.[email];
-  if (!record) return res.status(400).json({ message: "No OTP found for this email" });
-  if (Date.now() > record.expiry) return res.status(400).json({ message: "OTP expired" });
-  if (record.otp !== otp) return res.status(400).json({ message: "Invalid OTP" });
 
-  delete global.otpStore[email];
-  return res.status(200).json({ message: "OTP verified successfully!" });
+    const record = global.otpStore?.[email];
+    if (!record)
+      return res.status(400).json({ message: "No OTP found for this email" });
+    if (Date.now() > record.expiry)
+      return res.status(400).json({ message: "OTP expired" });
+    if (record.otp !== otp)
+      return res.status(400).json({ message: "Invalid OTP" });
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
+
+    await User.findByIdAndUpdate(user._id, {
+      isVerified: true,
+      otp: null,
+      otpExpiresAt: null,
+    });
+    delete global.otpStore[email];
+
+    return res.status(200).json({ message: "OTP verified successfully!" });
+  } catch (err) {
+    console.error("Error verifying OTP:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
 }
-
 async function validateInvitation(req, res) {
   try {
     const parsed = validateInvitationSchema.safeParse(req.query);

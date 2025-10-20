@@ -13,19 +13,24 @@ function signRefreshToken(payload) {
   return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_EXPIRES });
 }
 
-async function registerUser({ name, email, password, role, organizationId, createdBy }) {
+async function registerUser({ name, email, password, role, organizationId,mfaMethod,createdBy }) {
   email = String(email).toLowerCase().trim();
 
   const existing = await User.findOne({ email }).lean();
   if (existing) throw { status: 400, message: "Email already registered" };
+  if (!mfaMethod || !["otp", "totp"].includes(mfaMethod)) {
+    throw { status: 400, message: "mfaMethod is required and must be either 'otp' or 'totp'" };
+  }
 
   const userDoc = new User({
     name,
     email,
     passwordHash: password, 
     role: role || "client_user",
-    organizationId: organizationId || null,
+    organizationId: organizationId || null, 
+    mfaMethod: mfaMethod || 'otp', 
     createdBy: createdBy || null,
+    isVerified:false,
   });
 
   await userDoc.save();
@@ -42,6 +47,9 @@ async function loginUser({ email, password }) {
 
   const user = await User.findOne({ email }).select("+passwordHash +refreshToken +totpSecretHashed");
   if (!user) throw { status: 400, message: "Invalid credentials" };
+  if (!user.isVerified) {
+    throw { status: 403, message: "Please verify your account before logging in." };
+  }
 
   const passwordMatches = await bcrypt.compare(password, user.passwordHash);
   if (!passwordMatches) throw { status: 400, message: "Invalid credentials" };
