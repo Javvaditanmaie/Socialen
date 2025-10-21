@@ -19,7 +19,7 @@ function runValidation(req, res, next) {
 router.get(
   "/",
   authenticate,
-  roleMiddleware(["super_admin", "site_admin"]),
+  roleMiddleware(["super_admin", "site_admin","operator"]),
   getUsersValidator,
   runValidation,
   userController.listUsers
@@ -35,7 +35,7 @@ router.get(
 router.post(
   "/",
   authenticate,
-  roleMiddleware(["super_admin", "site_admin", "client_admin"]),
+  roleMiddleware(["super_admin", "site_admin", "client_admin","operator"]),
   createUserValidator,
   runValidation,
   userController.createUser
@@ -45,7 +45,7 @@ router.post(
 router.put(
   "/:id",
   authenticate,
-  roleMiddleware(["super_admin", "site_admin", "client_admin"]),
+  roleMiddleware(["super_admin", "site_admin", "client_admin","operator"]),
   updateUserValidator,
   runValidation,
   userController.updateUser
@@ -54,7 +54,7 @@ router.put(
 router.delete(
   "/:id",
   authenticate,
-  roleMiddleware(["super_admin", "site_admin"]),
+  roleMiddleware(["super_admin", "site_admin","operator","client_admin"]),
   userController.deleteUser
 );
 
