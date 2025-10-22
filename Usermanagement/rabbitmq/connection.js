@@ -1,13 +1,14 @@
-const amqp = require("amqplib");
+import amqp from "amqplib";
+
 const url = process.env.RABBITMQ_URL;
 
 let connection = null;
 let channel = null;
 
-async function getConnection() {
+export async function getConnection() {
   if (connection) return connection;
   connection = await amqp.connect(url);
-  connection.on("error", err => {
+  connection.on("error", (err) => {
     console.error("RabbitMQ connection error:", err);
     connection = null;
   });
@@ -18,12 +19,15 @@ async function getConnection() {
   return connection;
 }
 
-async function getChannel() {
+export async function getChannel() {
   if (channel) return channel;
   const conn = await getConnection();
   channel = await conn.createChannel();
-  await channel.assertExchange(process.env.RABBITMQ_EXCHANGE || "events", "topic", { durable: true });
+  await channel.assertExchange(
+    process.env.RABBITMQ_EXCHANGE || "events",
+    "topic",
+    { durable: true }
+  );
   return channel;
 }
-
-module.exports = { getConnection, getChannel };
+``

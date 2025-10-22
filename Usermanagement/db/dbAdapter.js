@@ -1,5 +1,3 @@
-// config/dbAdapter.js
-// Simple forwarder to mongoAdapter - makes it easy to swap adapters later
 const mongoAdapter = require("./mongoAdapter");
 
 module.exports = {

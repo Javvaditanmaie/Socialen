@@ -1,6 +1,6 @@
-const { body, param, query } = require("express-validator");
+import { body, param, query } from "express-validator";
 
-const createUserValidator = [
+export const createUserValidator = [
   body("name").trim().notEmpty().withMessage("Name is required"),
   body("email").isEmail().withMessage("Valid email required"),
   body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 chars"),
@@ -8,7 +8,7 @@ const createUserValidator = [
   body("organizationId").optional().isMongoId().withMessage("organizationId must be a valid id"),
 ];
 
-const updateUserValidator = [
+export const updateUserValidator = [
   param("id").isMongoId().withMessage("Invalid user id"),
   body("name").optional().isLength({ min: 2 }),
   body("email").optional().isEmail(),
@@ -16,9 +16,7 @@ const updateUserValidator = [
   body("role").optional().isIn(["super_admin", "site_admin", "operator", "client_admin", "client_user"]),
 ];
 
-const getUsersValidator = [
+export const getUsersValidator = [
   query("page").optional().toInt(),
   query("limit").optional().toInt(),
 ];
-
-module.exports = { createUserValidator, updateUserValidator, getUsersValidator };

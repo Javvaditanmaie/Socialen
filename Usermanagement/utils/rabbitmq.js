@@ -1,8 +1,8 @@
-const amqp = require('amqplib');
+import amqp from 'amqplib';
 
 let channel;
 
-async function connectRabbitMQ() {
+export async function connectRabbitMQ() {
   try {
     const connection = await amqp.connect('amqp://localhost'); // or your RabbitMQ URL
     channel = await connection.createChannel();
@@ -12,11 +12,9 @@ async function connectRabbitMQ() {
   }
 }
 
-function getChannel() {
+export function getChannel() {
   if (!channel) {
     throw new Error("RabbitMQ channel not initialized");
   }
   return channel;
 }
-
-module.exports = { connectRabbitMQ, getChannel };

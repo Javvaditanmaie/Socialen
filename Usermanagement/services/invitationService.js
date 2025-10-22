@@ -1,12 +1,12 @@
-const Invitation = require('../models/Invitation');
-const generateInvitationCode = require('../utils/invitationCode');
-const { v4: uuidv4 } = require('uuid');
-const bcrypt = require('bcryptjs');
-const emailService = require('./emailService');
-const { sendMail } = require('./emailService');
-const Organization = require('../models/Organization');
+import Invitation from '../models/Invitation.js';
+import generateInvitationCode from '../utils/invitationCode.js';
+import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
+import * as emailService from './emailService.js';
+import { sendMail, transporter } from './emailService.js';
+import Organization from '../models/Organization.js';
 
-async function createInvitation({ email, role, method, createdBy, organizationId,expiresInDays }) {
+export async function createInvitation({ email, role, method, createdBy, organizationId, expiresInDays }) {
   const code = uuidv4().slice(0, 8);
   const invitation = new Invitation({
     invitationId: uuidv4(),
@@ -15,16 +15,16 @@ async function createInvitation({ email, role, method, createdBy, organizationId
     role,
     method,
     createdBy,
-    status:"pending",
+    status: "pending",
     organizationId,
     expiresAt: new Date(Date.now() + (expiresInDays || 7) * 24 * 60 * 60 * 1000)
   });
 
   await invitation.save();
-  return invitation; 
+  return invitation;
 }
 
-async function validateInvitation(invitationId, code) {
+export async function validateInvitation(invitationId, code) {
   const inv = await Invitation.findOne({ invitationId }).select('+otpHash +otpExpiresAt');
   if (!inv) throw { status: 404, message: 'Invitation not found' };
   if (inv.status !== 'pending') throw { status: 400, message: 'Invitation not available' };
@@ -38,17 +38,16 @@ async function validateInvitation(invitationId, code) {
   return inv;
 }
 
-
-async function generateAndSendEmailOtp(invitation) {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString(); 
+export async function generateAndSendEmailOtp(invitation) {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const otpHash = await bcrypt.hash(otp, 12);
-  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); 
+  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
   invitation.otpHash = otpHash;
   invitation.otpExpiresAt = otpExpiresAt;
   await invitation.save();
 
-  await emailService.sendMail({
+  await sendMail({
     to: invitation.email,
     subject: 'Your signup OTP',
     text: `Your signup code is ${otp}. It expires in 10 minutes.`,
@@ -58,7 +57,7 @@ async function generateAndSendEmailOtp(invitation) {
   return { sent: true };
 }
 
-async function verifyInvitationOtp(invitationId, otpPlain) {
+export async function verifyInvitationOtp(invitationId, otpPlain) {
   const inv = await Invitation.findOne({ invitationId }).select('+otpHash +otpExpiresAt');
   if (!inv) throw { status: 404, message: 'Invitation not found' };
   if (!inv.otpHash || !inv.otpExpiresAt) throw { status: 400, message: 'No OTP issued' };
@@ -69,14 +68,15 @@ async function verifyInvitationOtp(invitationId, otpPlain) {
   return inv;
 }
 
-async function markUsed(invitationId) {
+export async function markUsed(invitationId) {
   const inv = await Invitation.findOne({ invitationId });
   if (!inv) throw { status: 404, message: 'Invitation not found' };
   inv.status = 'used';
   await inv.save();
   return inv;
 }
-async function sendInvitationEmail(to, subject, text, html) {
+
+export async function sendInvitationEmail(to, subject, text, html) {
   const mailOptions = {
     from: process.env.SMTP_USER,
     to,
@@ -88,11 +88,11 @@ async function sendInvitationEmail(to, subject, text, html) {
   await transporter.sendMail(mailOptions);
 }
 
-module.exports = {
+export default {
   createInvitation,
   validateInvitation,
   generateAndSendEmailOtp,
   verifyInvitationOtp,
   markUsed,
-  sendInvitationEmail
+  sendInvitationEmail,
 };

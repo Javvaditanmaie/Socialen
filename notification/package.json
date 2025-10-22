@@ -10,13 +10,16 @@
     "speakeasy": "^2.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
   },
   "name": "notification",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --runInBand",
+  "test:watch": "jest --watch",
     "start": "node app.js",
     "dev": "nodemon app.js"
   },

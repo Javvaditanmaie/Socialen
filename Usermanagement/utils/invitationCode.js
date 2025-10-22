@@ -1,11 +1,9 @@
-// utils/invitationCode.js
-//contains the function to generate code
 /**
  * Generates a random alphanumeric invitation code of given length.
  * @param {number} length - Length of the invitation code
  * @returns {string} Random invitation code
  */
-function generateInvitationCode(length = 8) {
+export function generateInvitationCode(length = 8) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let code = '';
   for (let i = 0; i < length; i++) {
@@ -13,5 +11,3 @@ function generateInvitationCode(length = 8) {
   }
   return code;
 }
-
-module.exports = generateInvitationCode;

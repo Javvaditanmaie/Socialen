@@ -1,25 +1,26 @@
-const express = require("express");
-const router = express.Router();
-const userController = require("../controllers/userController");
-const { authenticate } = require("../middleware/authMiddleware");
-const roleMiddleware = require("../middleware/roleMiddleware");
-const {
+import express from "express";
+import * as userController from "../controllers/userController.js";
+import { authenticate } from "../middleware/authMiddleware.js";
+import roleMiddleware from "../middleware/roleMiddleware.js";
+import {
   createUserValidator,
   updateUserValidator,
   getUsersValidator,
-} = require("../validators/userValidator");
-const { validationResult } = require("express-validator");
+} from "../validators/userValidator.js";
+import { validationResult } from "express-validator";
+
+const router = express.Router();
+
 function runValidation(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   next();
 }
 
-
 router.get(
   "/",
   authenticate,
-  roleMiddleware(["super_admin", "site_admin","operator"]),
+  roleMiddleware(["super_admin", "site_admin", "operator"]),
   getUsersValidator,
   runValidation,
   userController.listUsers
@@ -35,17 +36,16 @@ router.get(
 router.post(
   "/",
   authenticate,
-  roleMiddleware(["super_admin", "site_admin", "client_admin","operator"]),
+  roleMiddleware(["super_admin", "site_admin", "client_admin", "operator"]),
   createUserValidator,
   runValidation,
   userController.createUser
 );
 
-
 router.put(
   "/:id",
   authenticate,
-  roleMiddleware(["super_admin", "site_admin", "client_admin","operator"]),
+  roleMiddleware(["super_admin", "site_admin", "client_admin", "operator"]),
   updateUserValidator,
   runValidation,
   userController.updateUser
@@ -54,8 +54,8 @@ router.put(
 router.delete(
   "/:id",
   authenticate,
-  roleMiddleware(["super_admin", "site_admin","operator","client_admin"]),
+  roleMiddleware(["super_admin", "site_admin", "operator", "client_admin"]),
   userController.deleteUser
 );
 
-module.exports = router;
+export default router;

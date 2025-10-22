@@ -1,17 +1,16 @@
 // controllers/invitationController.js
-const invitationService = require('../services/invitationService');
-const authService = require('../services/authService');
-const User = require('../models/User');
-const Invitation = require('../models/Invitation');
-const { sanitizeUser } = require("../utils/sanitizeUser"); 
-const speakeasy = require('speakeasy');
-const qrcode = require('qrcode');
-const {sendMail}=require('../services/emailService')
-const { canSendInvitation } = require('../utils/permissions');
-const { publishEvent } = require("../rabbitmq/publisher");
+import invitationService from '../services/invitationService.js';
+import authService from '../services/authService.js';
+import User from '../models/User.js';
+import Invitation from '../models/Invitation.js';
+import { sanitizeUser } from "../utils/sanitizeUser.js"; 
+import speakeasy from 'speakeasy';
+import qrcode from 'qrcode';
+import { canSendInvitation } from '../utils/permissions.js';
+import { publishEvent } from "../rabbitmq/publisher.js";
 async function createInvitationController(req, res) {
   try {
-    const { email, role, method, expiresInDays } = req.body;
+    const { email, role, method, expiresInDays,organization } = req.body;
     const senderRole = req.user.role;
     const targetRole = role || 'client_user';
 
@@ -34,6 +33,7 @@ async function createInvitationController(req, res) {
       role: targetRole,
       method: method || 'TOTP',
       createdBy: req.user.sub,
+      organization:organization||null,
       expiresInDays: expiresInDays || 7
     });
 
@@ -45,6 +45,7 @@ async function createInvitationController(req, res) {
         code: inv.code,
         email: inv.email,
         role: inv.role,
+        organization: inv.organization||organization,
         expiresAt: inv.expiresAt,
         inviter: { id: req.user.sub, email: req.user.email }
       }
@@ -53,7 +54,7 @@ async function createInvitationController(req, res) {
 
     res.status(201).json({
       message: "Invitation created and queued for email",
-      invitation: { invitationId: inv.invitationId, code: inv.code, expiresAt: inv.expiresAt }
+      invitation: { invitationId: inv.invitationId, code: inv.code,role: inv.role,organization: inv.organization, expiresAt: inv.expiresAt }
     });
 
   } catch (err) {
@@ -84,11 +85,11 @@ async function acceptInvitation(req, res) {
     if (invitation.used) {
       return res.status(400).json({ message: "Invitation already used" });
     }
-
     res.status(200).json({
       message: "Invitation is valid",
       email: invitation.email,
       role: invitation.role,
+      organization: invitation.organization,
       expiresAt: invitation.expiresAt
     });
 
@@ -133,4 +134,4 @@ async function verifyInvitationController(req, res) {
   }
 }
 
-module.exports = { createInvitationController, acceptInvitation,verifyInvitationController,};
+export { createInvitationController, acceptInvitation,verifyInvitationController,};

@@ -1,6 +1,6 @@
-const { getChannel } = require("./connection");
+import { getChannel } from "./connection.js";
 
-async function publishEvent(routingKey, message) {
+export async function publishEvent(routingKey, message) {
   const channel = await getChannel();
   const exchange = process.env.RABBITMQ_EXCHANGE || "events";
   const payload = Buffer.from(JSON.stringify(message));
@@ -10,5 +10,3 @@ async function publishEvent(routingKey, message) {
   }
   return true;
 }
-
-module.exports = { publishEvent };

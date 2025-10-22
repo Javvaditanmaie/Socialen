@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const invitationSchema = new mongoose.Schema({
   invitationId: { type: String, required: true, unique: true }, 
@@ -21,11 +21,9 @@ const invitationSchema = new mongoose.Schema({
     enum: ['pending','used','expired'],
     default: 'pending'
   },
-
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   createdAt: { type: Date, default: Date.now },
   expiresAt: { type: Date, required: true }
 });
 
-
-module.exports = mongoose.model('Invitation', invitationSchema);
+export default mongoose.model('Invitation', invitationSchema);

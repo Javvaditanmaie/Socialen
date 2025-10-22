@@ -1,5 +1,5 @@
 
-const userService = require("../services/userService");
+import userService from "../services/userService.js";
 
 async function listUsers(req, res) {
   try {
@@ -79,4 +79,4 @@ async function deleteUser(req, res) {
   }
 }
 
-module.exports = { listUsers, getUser, createUser, updateUser, deleteUser };
+export { listUsers, getUser, createUser, updateUser, deleteUser };

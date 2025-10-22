@@ -1,19 +1,21 @@
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const User = require("../models/User");
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import User from "../models/User.js";
+
 const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 const ACCESS_EXPIRES = process.env.ACCESS_TOKEN_EXPIRY || "15m";
 const REFRESH_EXPIRES = process.env.REFRESH_TOKEN_EXPIRY || "30d";
-function signAccessToken(payload) {
+
+export function signAccessToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRES });
 }
 
-function signRefreshToken(payload) {
+export function signRefreshToken(payload) {
   return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_EXPIRES });
 }
 
-async function registerUser({ name, email, password, role, organizationId,mfaMethod,createdBy }) {
+export async function registerUser({ name, email, password, role, organizationId, mfaMethod, createdBy }) {
   email = String(email).toLowerCase().trim();
 
   const existing = await User.findOne({ email }).lean();
@@ -25,12 +27,12 @@ async function registerUser({ name, email, password, role, organizationId,mfaMet
   const userDoc = new User({
     name,
     email,
-    passwordHash: password, 
+    passwordHash: password,
     role: role || "client_user",
-    organizationId: organizationId || null, 
-    mfaMethod: mfaMethod || 'otp', 
+    organizationId: organizationId || null,
+    mfaMethod: mfaMethod || 'otp',
     createdBy: createdBy || null,
-    isVerified:false,
+    isVerified: false,
   });
 
   await userDoc.save();
@@ -42,7 +44,7 @@ async function registerUser({ name, email, password, role, organizationId,mfaMet
   return user;
 }
 
-async function loginUser({ email, password }) {
+export async function loginUser({ email, password }) {
   email = String(email).toLowerCase().trim();
 
   const user = await User.findOne({ email }).select("+passwordHash +refreshToken +totpSecretHashed");
@@ -81,8 +83,7 @@ async function loginUser({ email, password }) {
   return { accessToken, refreshToken: refreshTokenPlain, user: safeUser };
 }
 
-
-async function refreshAccessToken(refreshToken) {
+export async function refreshAccessToken(refreshToken) {
   if (!refreshToken) throw { status: 401, message: "Refresh token required" };
 
   let decoded;
@@ -115,19 +116,18 @@ async function refreshAccessToken(refreshToken) {
   return { accessToken: newAccessToken, refreshToken: newRefreshPlain };
 }
 
-
-async function logout(userId) {
+export async function logout(userId) {
   const user = await User.findById(userId);
   if (!user) return;
   user.refreshToken = null;
   await user.save();
 }
 
-module.exports = {
+export default {
+  signAccessToken,
+  signRefreshToken,
   registerUser,
   loginUser,
   refreshAccessToken,
   logout,
-  signAccessToken,
-  signRefreshToken,
 };

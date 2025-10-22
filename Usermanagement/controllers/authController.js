@@ -1,20 +1,22 @@
-const authService = require("../services/authService");
-const invitationService = require('../services/invitationService');
-const User = require("../models/User");
-const mongoose = require('mongoose');
-const jwt = require("jsonwebtoken");
-const speakeasy = require("speakeasy");
-const qrcode = require("qrcode");
-const bcrypt = require("bcryptjs");
-const Organization = require("../models/Organization");
-const crypto = require("crypto");
-const amqp = require('amqplib');
-const { signupSchema,
+import authService from "../services/authService.js";
+import invitationService from "../services/invitationService.js";
+import User from "../models/User.js";
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import speakeasy from "speakeasy";
+import qrcode from "qrcode";
+import bcrypt from "bcryptjs";
+import Organization from "../models/Organization.js";
+import crypto from "crypto";
+import amqp from "amqplib";
+import {
+  signupSchema,
   signinSchema,
   sendOTPSchema,
   verifyOTPSchema,
   totpSetupSchema,
-  validateInvitationSchema } = require("../validators/authValidator");
+  validateInvitationSchema,
+} from "../validators/authValidator.js";
 
 async function signup(req, res) {
   try {
@@ -47,7 +49,7 @@ async function signup(req, res) {
         createdBy: inv.createdBy || null, 
       });
 
-      inv.status = "accepted";
+      inv.status = "used";
       inv.acceptedAt = new Date();
       inv.acceptedUserId = user.id || user._id;
       await inv.save();
@@ -198,8 +200,8 @@ async function totpSetup(req, res) {
   try {
     const parsed = totpSetupSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
-    const { email } = parsed.data;
 
+    const { email } = parsed.data;
     if (!email) return res.status(400).json({ error: "Email is required." });
 
     const user = await User.findOne({ email });
@@ -208,11 +210,19 @@ async function totpSetup(req, res) {
     if (user.mfaMethod !== "totp")
       return res.status(400).json({ error: "TOTP is not enabled for this user." });
 
-    const secret = speakeasy.generateSecret({ name: `MyApp (${email})` });
-    user.totpSecret = secret.base32;
-    await user.save();
+    let secret;
+    // Only generate a new secret if one doesn't already exist
+    if (!user.totpSecret) {
+      secret = speakeasy.generateSecret({ name: `MyApp (${email})` });
+      user.totpSecret = secret.base32;
+      await user.save();
+    } else {
+      // Use existing secret
+      secret = { base32: user.totpSecret };
+    }
 
-    const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+    const otpauthUrl = `otpauth://totp/MyApp:${email}?secret=${secret.base32}&issuer=MyApp`;
+    const qrCodeUrl = await qrcode.toDataURL(otpauthUrl);
 
     res.status(200).json({
       message: "TOTP setup generated successfully.",
@@ -446,7 +456,7 @@ async function validateInvitation(req, res) {
 }
 
 
-module.exports = {
+export {
   signup,
   signin,
   loginTOTP,
