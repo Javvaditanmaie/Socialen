@@ -109,7 +109,7 @@ async function signin(req, res) {
     if (!email || !password)
       return res.status(400).json({ error: "Email and password required" });
 
-    const user = await User.findOne({ email }).select("+passwordHash +totpSecret");
+    const user = await User.findOne({ email }, "+passwordHash +totpSecret");
 
     if (!user) return res.status(400).json({ error: "Invalid credentials" });
 
@@ -146,7 +146,7 @@ async function loginTOTP(req, res) {
   try {
     const { email, code } = req.body;
 
-    const user = await User.findOne({ email }).select("+refreshToken +totpSecret");
+    const user = await User.findOne({ email }, "+refreshToken +totpSecret");
     if (!user || !user.totpSecret)
       return res.status(400).json({ error: "TOTP not set up for this user" });
 

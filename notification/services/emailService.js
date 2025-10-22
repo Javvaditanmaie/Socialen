@@ -3,8 +3,8 @@ const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: Number(process.env.SMTP_PORT) || 465, // 👈 Use 465 for secure SSL
-  secure: true, // true for port 465, false for 587
+  port: Number(process.env.SMTP_PORT) || 465, 
+  secure: true, 
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -21,7 +21,7 @@ transporter.verify((err, success) => {
 
 async function sendMail({ to, subject, text, html }) {
   try {
-    console.log("📧 Sending email to:", to);
+    console.log("Sending email to:", to);
     const info = await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to,

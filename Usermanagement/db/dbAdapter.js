@@ -1,6 +1,6 @@
-const mongoAdapter = require("./mongoAdapter");
+import mongoAdapter from "./mongoAdapter.js";
 
-module.exports = {
+const dbAdapter = {
   create: mongoAdapter.create,
   findOne: mongoAdapter.findOne,
   findById: mongoAdapter.findById,
@@ -11,3 +11,5 @@ module.exports = {
   deleteById: mongoAdapter.deleteById,
   count: mongoAdapter.count,
 };
+
+export default dbAdapter;

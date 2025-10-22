@@ -74,3 +74,10 @@ export async function deleteUser(id) {
   if (!deleted) throw { status: 404, message: "User not found" };
   return true;
 }
+export default {
+  listUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser
+};

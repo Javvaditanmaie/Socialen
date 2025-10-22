@@ -1,9 +1,9 @@
 /**
- * Generates a random alphanumeric invitation code of given length.
- * @param {number} length - Length of the invitation code
- * @returns {string} Random invitation code
+ * Generates a random alphanumeric invitation code of a given length.
+ * @param {number} length - Length of the invitation code.
+ * @returns {string} Random invitation code.
  */
-export function generateInvitationCode(length = 8) {
+export default function generateInvitationCode(length = 8) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let code = '';
   for (let i = 0; i < length; i++) {

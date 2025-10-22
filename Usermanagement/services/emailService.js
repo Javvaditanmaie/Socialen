@@ -11,13 +11,15 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("SMTP connection failed:", error.message);
-  } else {
-    console.log("SMTP server is ready to take our messages!");
-  }
-});
+if (process.env.NODE_ENV !== 'test') {
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error("SMTP connection failed:", error.message);
+    } else {
+      console.log("SMTP server is ready to take our messages!");
+    }
+  });
+}
 
 /**
  * Send an email
@@ -29,6 +31,9 @@ transporter.verify((error, success) => {
  */
 async function sendMail({ to, subject, text, html }) {
   try {
+    if (process.env.NODE_ENV === 'test') {
+      return { messageId: 'test-message', accepted: [to], subject };
+    }
     const info = await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to,
@@ -44,7 +49,7 @@ async function sendMail({ to, subject, text, html }) {
   }
 }
 
-export { transporter };
+export { transporter, sendMail };
 
 
 

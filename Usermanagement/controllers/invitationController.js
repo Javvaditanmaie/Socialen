@@ -3,7 +3,7 @@ import invitationService from '../services/invitationService.js';
 import authService from '../services/authService.js';
 import User from '../models/User.js';
 import Invitation from '../models/Invitation.js';
-import { sanitizeUser } from "../utils/sanitizeUser.js"; 
+import  sanitizeUser  from "../utils/sanitizeUser.js"; 
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import { canSendInvitation } from '../utils/permissions.js';

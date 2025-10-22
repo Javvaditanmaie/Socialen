@@ -1,5 +1,4 @@
-
-module.exports = {
+export default {
   create: async (Model, data) => {
     return Model.create(data);
   },
@@ -34,5 +33,5 @@ module.exports = {
 
   count: async (Model, query = {}) => {
     return Model.countDocuments(query);
-  }
+  },
 };
