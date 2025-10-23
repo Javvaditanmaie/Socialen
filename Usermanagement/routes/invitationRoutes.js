@@ -6,6 +6,6 @@ const router = express.Router();
 
 router.post("/create", authenticate, invitationController.createInvitationController);
 router.get("/accept", invitationController.acceptInvitation);
-router.post("/verify", invitationController.verifyInvitationController);
+router.get("/verify", invitationController.verifyInvitationController);
 
 export default router;

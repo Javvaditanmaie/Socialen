@@ -1,4 +1,3 @@
-// tests/controllers/invitationController.test.js
 import { createInvitationController, acceptInvitation, verifyInvitationController } from '../../controllers/invitationController.js';
 import Invitation from '../../models/Invitation.js';
 import * as invitationService from '../../services/invitationService.js';
