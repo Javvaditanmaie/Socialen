@@ -9,10 +9,12 @@ jest.mock("../../services/invitationService.js");
 jest.mock("../../rabbitmq/publisher.js");
 
 describe("Invitation API Tests", () => {
-  const results = [];
+  const results = []; 
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
+
   async function runWithTiming(testName, testFn) {
     const start = Date.now();
     try {
@@ -27,59 +29,71 @@ describe("Invitation API Tests", () => {
       throw err; 
     }
   }
+
   test("POST /api/invitations/create - success", async () => {
-    Invitation.findOne.mockResolvedValue(null);
-    invitationService.createInvitation.mockResolvedValue({
-      invitationId: "inv123",
-      code: "abc123",
-      email: "user@example.com",
-      role: "client_user",
-      organization: null,
-      expiresAt: new Date()
-    });
-    publishEvent.mockResolvedValue(true);
-
-    const res = await request(app)
-      .post("/api/invitations/create")
-      .send({
+    await runWithTiming("Create Invitation", async () => {
+      Invitation.findOne.mockResolvedValue(null);
+      invitationService.createInvitation.mockResolvedValue({
+        invitationId: "inv123",
+        code: "abc123",
         email: "user@example.com",
-        role: "client_user"
-      })
-      .set("Authorization", "Bearer fake-jwt");
+        role: "client_user",
+        organization: null,
+        expiresAt: new Date()
+      });
+      publishEvent.mockResolvedValue(true);
 
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toHaveProperty("message");
-    expect(res.body.invitation).toHaveProperty("invitationId");
+      const res = await request(app)
+        .post("/api/invitations/create")
+        .send({
+          email: "user@example.com",
+          role: "client_user"
+        })
+        .set("Authorization", "Bearer fake-jwt");
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body).toHaveProperty("message");
+      expect(res.body.invitation).toHaveProperty("invitationId");
+    });
   });
 
   test("GET /api/invitations/accept - expired invitation", async () => {
-    Invitation.findOne.mockResolvedValue({
-      expiresAt: new Date(Date.now() - 1000),
-      used: false
+    await runWithTiming("Accept Expired Invitation", async () => {
+      Invitation.findOne.mockResolvedValue({
+        expiresAt: new Date(Date.now() - 1000),
+        used: false
+      });
+
+      const res = await request(app)
+        .get("/api/invitations/accept")
+        .query({ invitationId: "inv123", code: "xyz789" });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toBe("Invitation expired");
     });
-
-    const res = await request(app)
-      .get("/api/invitations/accept")
-      .query({ invitationId: "inv123", code: "xyz789" });
-
-    expect(res.statusCode).toBe(400);
-    expect(res.body.message).toBe("Invitation expired");
   });
 
   test("GET /api/invitations/verify - valid invitation", async () => {
-    Invitation.findOne.mockResolvedValue({
-      status: "pending",
-      expiresAt: new Date(Date.now() + 1000 * 60),
-      email: "user@example.com",
-      role: "client_user",
-      save: jest.fn()
+    await runWithTiming("Verify Invitation", async () => {
+      Invitation.findOne.mockResolvedValue({
+        status: "pending",
+        expiresAt: new Date(Date.now() + 1000 * 60),
+        email: "user@example.com",
+        role: "client_user",
+        save: jest.fn()
+      });
+
+      const res = await request(app)
+        .get("/api/invitations/verify")
+        .query({ invitationId: "inv123", code: "xyz789" });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.message).toBe("Invitation verified successfully");
     });
+  });
 
-    const res = await request(app)
-      .get("/api/invitations/verify")
-      .query({ invitationId: "inv123", code: "xyz789" });
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.message).toBe("Invitation verified successfully");
+  afterAll(() => {
+    console.log("\n TEST SUMMARY");
+    console.table(results);
   });
 });

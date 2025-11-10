@@ -9,7 +9,7 @@ export async function getConnection() {
   if (connection) return connection;
   connection = await amqp.connect(url);
   connection.on("error", (err) => {
-    console.error("RabbitMQ connection error:", err);
+    console.error("RabbitMQ connection error:", err.message);
     connection = null;
   });
   connection.on("close", () => {
@@ -30,4 +30,4 @@ export async function getChannel() {
   );
   return channel;
 }
-``
+//handles connecting and managing rabbitmq

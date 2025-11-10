@@ -8,6 +8,7 @@ import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import { canSendInvitation } from '../utils/permissions.js';
 import { publishEvent } from "../rabbitmq/publisher.js";
+import { getIO } from "../socket/socketServer.js"; 
 async function createInvitationController(req, res) {
   try {
     const { email, role, method, expiresInDays,organization } = req.body;
@@ -52,6 +53,22 @@ async function createInvitationController(req, res) {
     };
     await publishEvent(process.env.RABBITMQ_ROUTE_INVITE, payload);
 
+     try {
+      const io = getIO();
+      io.emit("newInvitation", {
+        message: `New invitation sent to ${inv.email}`,
+        data: {
+          invitationId: inv.invitationId,
+          role: inv.role,
+          organization: inv.organization,
+          expiresAt: inv.expiresAt
+        }
+      });
+      console.log(` WebSocket notification sent for invitation ${inv.invitationId}`);
+    } catch (socketErr) {
+      console.warn(" WebSocket not initialized yet. Skipping real-time emit.");
+    }
+
     res.status(201).json({
       message: "Invitation created and queued for email",
       invitation: { invitationId: inv.invitationId, code: inv.code,role: inv.role,organization: inv.organization, expiresAt: inv.expiresAt }
@@ -84,6 +101,16 @@ async function acceptInvitation(req, res) {
 
     if (invitation.used) {
       return res.status(400).json({ message: "Invitation already used" });
+    }
+    try {
+      const io = getIO();
+      io.emit("invitationAccepted", {
+        message: `${invitation.email} accepted the invitation.`,
+        invitationId: invitation.invitationId,
+      });
+      console.log(` WebSocket notification: Invitation ${invitation.invitationId} accepted`);
+    } catch (socketErr) {
+      console.warn(" WebSocket not initialized. Skipping real-time emit.");
     }
     res.status(200).json({
       message: "Invitation is valid",

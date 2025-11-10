@@ -7,6 +7,7 @@ import authService from "../../services/authService.js";
 import invitationService from "../../services/invitationService.js";
 import speakeasy from "speakeasy";
 import bcrypt from "bcryptjs";
+import amqp from "amqplib";
 
 jest.mock("../../models/User.js");
 jest.mock("../../models/Organization.js");
@@ -14,6 +15,7 @@ jest.mock("../../services/authService.js");
 jest.mock("../../services/invitationService.js");
 jest.mock("speakeasy");
 jest.mock("bcryptjs");
+jest.mock("amqplib");
 
 describe("Auth Controller API Tests", () => {
   const results = [];
@@ -107,26 +109,40 @@ describe("Auth Controller API Tests", () => {
   });
 
   it("Send OTP", async () => {
+    const mockChannel = {
+      assertExchange: jest.fn(),
+      publish: jest.fn(),
+      close: jest.fn(),
+    };
+    const mockConnection = {
+      createChannel: jest.fn().mockResolvedValue(mockChannel),
+      close: jest.fn(),
+    };
+    
+    // Mock amqp.connect
+    amqp.connect.mockResolvedValue(mockConnection);
+  
     await runTest("Send OTP", "post", "/api/auth/send-otp", {
       email: "john@example.com",
     });
   });
-
+  
   it("Verify OTP", async () => {
+    // Pre-populate OTP store
     global.otpStore["john@example.com"] = { otp: "123456", expiry: Date.now() + 5000 };
-
+    User.findOne.mockResolvedValue({ _id: "user123", email: "john@example.com" });
+    User.findByIdAndUpdate.mockResolvedValue({});
+  
     await runTest("Verify OTP", "post", "/api/auth/verify-otp", {
       email: "john@example.com",
       otp: "123456",
     });
   });
-
   it("Refresh Token", async () => {
     await runTest("Refresh Token", "post", "/api/auth/refresh", {
       refreshToken: "refresh123",
     });
   });
-
   it("Logout", async () => {
     await runTest("Logout", "post", "/api/auth/logout", {
       token: "access123",
