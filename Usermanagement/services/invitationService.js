@@ -1,31 +1,36 @@
-import Invitation from '../models/Invitation.js';
-import generateInvitationCode from '../utils/invitationCode.js';
-import { v4 as uuidv4 } from 'uuid';
-import bcrypt from 'bcryptjs';
-import * as emailService from './emailService.js';
-import { sendMail, transporter } from './emailService.js';
-import Organization from '../models/Organization.js';
+import Invitation from "../models/Invitation.js";
+import generateInvitationCode from "../utils/invitationCode.js";
+import { v4 as uuidv4 } from "uuid";
+import bcrypt from "bcryptjs";
+import { sendMail, transporter } from "./emailService.js";
+import dbAdapter from "../db/dbAdapter.js";
 
-export async function createInvitation({ email, role, method, createdBy, organizationId, expiresInDays }) {
-  const code = uuidv4().slice(0, 8);
-  const invitation = new Invitation({
+export async function createInvitation({
+  email,
+  role,
+  method,
+  createdBy,
+  organizationId,
+  expiresInDays,
+}) {
+  const invitation = await dbAdapter.create(Invitation, {
     invitationId: uuidv4(),
-    code,
+    code: generateInvitationCode(),
     email,
     role,
     method,
     createdBy,
     status: "pending",
     organizationId,
-    expiresAt: new Date(Date.now() + (expiresInDays || 7) * 24 * 60 * 60 * 1000)
+    expiresAt: new Date(Date.now() + (expiresInDays || 7) * 24 * 60 * 60 * 1000),
   });
-
-  await invitation.save();
   return invitation;
 }
 
 export async function validateInvitation(invitationId, code) {
-  const inv = await Invitation.findOne({ invitationId }).select('+otpHash +otpExpiresAt');
+  const inv = await dbAdapter
+    .findOne(Invitation, { invitationId })
+    .select("+otpHash +otpExpiresAt");
   if (!inv) throw { status: 404, message: 'Invitation not found' };
   if (inv.status !== 'pending') throw { status: 400, message: 'Invitation not available' };
   if (inv.expiresAt && inv.expiresAt < new Date()) {
@@ -58,7 +63,9 @@ export async function generateAndSendEmailOtp(invitation) {
 }
 
 export async function verifyInvitationOtp(invitationId, otpPlain) {
-  const inv = await Invitation.findOne({ invitationId }).select('+otpHash +otpExpiresAt');
+  const inv = await dbAdapter
+    .findOne(Invitation, { invitationId })
+    .select("+otpHash +otpExpiresAt");
   if (!inv) throw { status: 404, message: 'Invitation not found' };
   if (!inv.otpHash || !inv.otpExpiresAt) throw { status: 400, message: 'No OTP issued' };
   if (inv.otpExpiresAt < new Date()) throw { status: 400, message: 'OTP expired' };
@@ -69,7 +76,7 @@ export async function verifyInvitationOtp(invitationId, otpPlain) {
 }
 
 export async function markUsed(invitationId) {
-  const inv = await Invitation.findOne({ invitationId });
+  const inv = await dbAdapter.findOne(Invitation, { invitationId });
   if (!inv) throw { status: 404, message: 'Invitation not found' };
   inv.status = 'used';
   await inv.save();

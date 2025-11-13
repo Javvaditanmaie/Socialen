@@ -1,14 +1,10 @@
 // controllers/invitationController.js
-import invitationService from '../services/invitationService.js';
-import authService from '../services/authService.js';
-import User from '../models/User.js';
-import Invitation from '../models/Invitation.js';
-import  sanitizeUser  from "../utils/sanitizeUser.js"; 
-import speakeasy from 'speakeasy';
-import qrcode from 'qrcode';
-import { canSendInvitation } from '../utils/permissions.js';
+import invitationService from "../services/invitationService.js";
+import Invitation from "../models/Invitation.js";
+import { canSendInvitation } from "../utils/permissions.js";
 import { publishEvent } from "../rabbitmq/publisher.js";
-import { getIO } from "../socket/socketServer.js"; 
+import { getIO } from "../socket/socketServer.js";
+import dbAdapter from "../db/dbAdapter.js";
 async function createInvitationController(req, res) {
   try {
     const { email, role, method, expiresInDays,organization } = req.body;
@@ -19,10 +15,10 @@ async function createInvitationController(req, res) {
       return res.status(403).json({ message: "You are not allowed to send invitation to this role." });
     }
 
-    const existingInvite = await Invitation.findOne({
+    const existingInvite = await dbAdapter.findOne(Invitation, {
       email,
       status: "pending",
-      expiresAt: { $gt: new Date() }
+      expiresAt: { $gt: new Date() },
     });
     if (existingInvite) {
       const diffDays = Math.ceil((existingInvite.expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
@@ -89,19 +85,38 @@ async function acceptInvitation(req, res) {
     }
 
     
-    const invitation = await Invitation.findOne({ invitationId, code });
+    const invitation = await dbAdapter.findOne(Invitation, { invitationId, code });
 
     if (!invitation) {
       return res.status(404).json({ message: "Invitation not found" });
     }
 
     if (invitation.expiresAt < new Date()) {
+      await publishEvent("invitation.expired", {
+        type: "invitation_expired",
+        email: invitation.email,
+        sender: invitation.createdBy,
+        message: `Invitation for ${invitation.email} has expired.`,
+      });
       return res.status(400).json({ message: "Invitation expired" });
     }
 
     if (invitation.used) {
       return res.status(400).json({ message: "Invitation already used" });
     }
+    //invitation as accepted
+    invitation.used = true;
+    invitation.status = "accepted";
+    invitation.acceptedAt = new Date();
+    await invitation.save();
+
+    await publishEvent("invitation.accepted",{
+      type:"invitation_accepted",
+      email:invitation.email,
+      sender:invitation.createdBy,
+      message:`${invitation.email} accepted your invitation`,
+      invitationId:invitation.invitationId,
+    })
     try {
       const io = getIO();
       io.emit("invitationAccepted", {
@@ -133,7 +148,7 @@ async function verifyInvitationController(req, res) {
       return res.status(400).json({ error: "Invitation ID and code are required" });
     }
 
-    const invitation = await Invitation.findOne({ invitationId, code });
+    const invitation = await dbAdapter.findOne(Invitation, { invitationId, code });
     if (!invitation) {
       return res.status(404).json({ error: "Invalid or broken invitation link" });
     }

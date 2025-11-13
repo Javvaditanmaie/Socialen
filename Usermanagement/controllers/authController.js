@@ -105,7 +105,7 @@ async function signin(req, res) {
   try {
     const parsed = signinSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
-    const { email, password, otp } = parsed.data;
+    const { email, password,otp } = parsed.data;
     if (!email || !password)
       return res.status(400).json({ error: "Email and password required" });
 

@@ -1,18 +1,23 @@
-const { connect } = require("./connection");
-const { sendMail } = require("../services/emailService");
+import { connect } from "./connection.js";
+import { sendMail } from "../services/emailService.js";
+import { getIO } from "../socket/socketServer.js"
 
-async function startConsumer() {
+export async function startConsumer() {
   const { channel } = await connect();
   const exchange = process.env.RABBITMQ_EXCHANGE || "events";
   const inviteQueue = process.env.RABBITMQ_QUEUE_EMAIL || "notifications.email";
   const otpQueue = process.env.RABBITMQ_QUEUE_OTP || "notifications.otp";
   const inviteKey = process.env.RABBITMQ_ROUTE_INVITE || "user.invite.created";
   const otpKey = process.env.RABBITMQ_ROUTE_OTP || "user.otp.send";
+  const realtimeQueue=process.env.RABBITMQ_QUEUE_REALTIME || "notifications.realtime"
+  const realtimeKey=process.env.RABBITMQ_QUEUE_REALTIME||"invitation.*"
   await channel.assertQueue(inviteQueue, { durable: true });
   await channel.assertQueue(otpQueue, { durable: true });
+  await channel.assertQueue(realtimeQueue,{durable:true})
 
   await channel.bindQueue(inviteQueue, exchange, inviteKey);
   await channel.bindQueue(otpQueue, exchange, otpKey);
+  await channel.bindQueue(realtimeQueue,exchange,realtimeKey)
 
   console.log(" Consumers ready for Invitations and OTP emails...");
   channel.consume(inviteQueue, async (msg) => {
@@ -65,6 +70,24 @@ async function startConsumer() {
       channel.nack(msg, false, false);
     }
   });
+  channel.consume(realtimeQueue,(msg)=>{
+    if(!msg?.content){
+      return;
+    }
+    try{
+      const data=JSON.parse(msg.content.toString());
+      const io=getIO();
+      console.log("realtime recevide:",data);
+      io.emit("notification",{
+        message:data.message,
+        email:data.email,
+        type:data.type,
+      });
+      channel.ack(msg)
+    }catch(err){
+      console.error("realtime consumer error",err);
+      channel.nack(msg,false,false);
+    }
+  })
 }
 
-module.exports = { startConsumer };

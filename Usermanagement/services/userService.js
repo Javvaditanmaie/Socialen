@@ -1,31 +1,38 @@
 import User from "../models/User.js";
 import Organization from "../models/Organization.js";
-import db from "../db/dbAdapter.js";
-import bcrypt from "bcryptjs";
+import dbAdapter from "../db/dbAdapter.js";
 
 export async function listUsers({ page = 1, limit = 20, filter = {} }) {
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
-    User.find(filter).select("-passwordHash -refreshToken -totpSecretHashed").skip(skip).limit(limit).lean(),
-    User.countDocuments(filter)
+    dbAdapter
+      .find(User, filter)
+      .select("-passwordHash -refreshToken -totpSecretHashed")
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    dbAdapter.count(User, filter),
   ]);
   return { items, total, page, limit };
 }
 
 export async function getUserById(id) {
-  const user = await User.findById(id).select("-passwordHash -refreshToken -totpSecretHashed").lean();
+  const user = await dbAdapter
+    .findById(User, id)
+    .select("-passwordHash -refreshToken -totpSecretHashed")
+    .lean();
   return user;
 }
 
 export async function createUser(payload, actor = null) {
   if (payload.organizationId) {
-    const org = await Organization.findById(payload.organizationId);
+    const org = await dbAdapter.findById(Organization, payload.organizationId);
     if (!org) throw { status: 400, message: "Organization not found" };
   }
-  const exists = await User.findOne({ email: payload.email.toLowerCase().trim() });
+  const exists = await dbAdapter.findOne(User, { email: payload.email.toLowerCase().trim() });
   if (exists) throw { status: 400, message: "Email already exists" };
 
-  const user = new User({
+  const user = await dbAdapter.create(User, {
     name: payload.name,
     email: payload.email.toLowerCase().trim(),
     passwordHash: payload.password, 
@@ -35,8 +42,6 @@ export async function createUser(payload, actor = null) {
     totpEnabled: payload.totpEnabled || false,
   });
 
-  await user.save();
-
   const safe = user.toObject();
   delete safe.passwordHash;
   delete safe.refreshToken;
@@ -45,7 +50,7 @@ export async function createUser(payload, actor = null) {
 }
 
 export async function updateUser(id, payload, actor = null) {
-  const user = await User.findById(id);
+  const user = await dbAdapter.findById(User, id);
   if (!user) throw { status: 404, message: "User not found" };
 
   if (actor.role === "client_admin" || actor.role === "operator") {
@@ -70,7 +75,7 @@ export async function updateUser(id, payload, actor = null) {
 }
 
 export async function deleteUser(id) {
-  const deleted = await User.findByIdAndDelete(id);
+  const deleted = await dbAdapter.deleteById(User, id);
   if (!deleted) throw { status: 404, message: "User not found" };
   return true;
 }

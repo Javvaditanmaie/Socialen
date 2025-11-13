@@ -4,7 +4,7 @@ const url = process.env.RABBITMQ_URL;
 
 let connection = null;
 let channel = null;
-
+//connect to rabbitmq onces and reuses it
 export async function getConnection() {
   if (connection) return connection;
   connection = await amqp.connect(url);
@@ -18,11 +18,12 @@ export async function getConnection() {
   });
   return connection;
 }
-
+// creates or reuses a channel from the connection
 export async function getChannel() {
   if (channel) return channel;
   const conn = await getConnection();
   channel = await conn.createChannel();
+  //exchange exists before using it
   await channel.assertExchange(
     process.env.RABBITMQ_EXCHANGE || "events",
     "topic",
