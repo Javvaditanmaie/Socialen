@@ -5,10 +5,13 @@ import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import speakeasy from "speakeasy";
 import qrcode from "qrcode";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs"; 
+import dbAdapter from "../db/dbAdapter.js";
+import {generateOTP,verifyOTPService} from "../services/otp.service.js"
 import Organization from "../models/Organization.js";
 import crypto from "crypto";
 import amqp from "amqplib";
+import axios from "axios"
 import {
   signupSchema,
   signinSchema,
@@ -66,10 +69,10 @@ async function signup(req, res) {
     let organizationId = null;
     if (organizationName) {
       const normalized = String(organizationName).trim();
-      let org = await Organization.findOne({ name: normalized });
+      let org = await dbAdapter.findOne(Organization,{ name: normalized });
       if (!org) {
         const slug = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        org = await Organization.create({ name: normalized, slug });
+        org = await dbAdapter.create(Organization,{ name: normalized, slug });
       }
       organizationId = org._id;
     }
@@ -109,7 +112,7 @@ async function signin(req, res) {
     if (!email || !password)
       return res.status(400).json({ error: "Email and password required" });
 
-    const user = await User.findOne({ email }, "+passwordHash +totpSecret");
+    const user = await dbAdapter.findOne(User,{ email }, "+passwordHash +totpSecret");
 
     if (!user) return res.status(400).json({ error: "Invalid credentials" });
 
@@ -146,7 +149,7 @@ async function loginTOTP(req, res) {
   try {
     const { email, code } = req.body;
 
-    const user = await User.findOne({ email }, "+refreshToken +totpSecret");
+    const user = await dbAdapter.findOne(User,{ email }, "+refreshToken +totpSecret");
     if (!user || !user.totpSecret)
       return res.status(400).json({ error: "TOTP not set up for this user" });
 
@@ -204,7 +207,7 @@ async function totpSetup(req, res) {
     const { email } = parsed.data;
     if (!email) return res.status(400).json({ error: "Email is required." });
 
-    const user = await User.findOne({ email });
+    const user = await dbAdapter.findOne(User,{ email });
     if (!user) return res.status(404).json({ error: "User not found." });
 
     if (user.mfaMethod !== "totp")
@@ -243,7 +246,7 @@ async function verifyTotp(req, res) {
       return res.status(400).json({ error: "Email and code are required" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await dbAdapter.findOne(User,{ email });
     if (!user || !user.totpSecret) {
       return res.status(404).json({ error: "User or TOTP secret not found" });
     }
@@ -258,13 +261,14 @@ async function verifyTotp(req, res) {
     if (!verified) {
       return res.status(400).json({ error: "Invalid or expired TOTP code" });
     }
-    user.totpEnabled = true;
-    await user.save();
+    //user.totpEnabled = true;
+    //await user.save();
+    await dbAdapter.findByIdAndUpdate(User, user._id, { totpEnabled: true });
 
     return res.status(200).json({ message: "TOTP verified successfully", verified: true });
   } catch (error) {
     console.error("TOTP verify error:", error);
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ error:err.message });
   }
 }
 
@@ -311,7 +315,7 @@ async function logout(req, res) {
 async function getProfile(req, res) {
   try {
     const userId = req.user.sub || req.user._id;
-    const user = await User.findById(userId)
+    const user = await dbAdapter.findById(User,userId)
       .populate("role", "name")
       .populate("organizationId", "name");
 
@@ -352,11 +356,6 @@ async function assignRole(req, res) {
     res.status(500).json({ error: err.message });
   }
 }
-async function generateOTP(email) {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiry = Date.now() + 5 * 60 * 1000; // valid 5 min
-  return { otp, expiry, email };
-}
 
 async function sendOTP(req, res) {
   try {
@@ -364,20 +363,20 @@ async function sendOTP(req, res) {
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
 
     const { email } = parsed.data;
+    
     if (!email) return res.status(400).json({ message: "Email required" });
-
+    // generate otp and store in redis return only otp, redis manages expiry
+    const  otp  = await generateOTP(email);
+    //connect to rabbitmq
     const connection = await amqp.connect(process.env.RABBITMQ_URL);
     const channel = await connection.createChannel();
 
     await channel.assertExchange(process.env.RABBITMQ_EXCHANGE, "topic", { durable: true });
-
-    const { otp, expiry } = await generateOTP(email);
-
+    //publish message to notification service
     const message = {
       type: "otp",
       email,
       otp,
-      expiry,
       subject: "Your OTP Code",
     };
 
@@ -387,13 +386,9 @@ async function sendOTP(req, res) {
       Buffer.from(JSON.stringify(message))
     );
 
-    console.log("OTP published to RabbitMQ:", message);
+    console.log("OTP published to RabbitMQ");
     await channel.close();
     await connection.close();
-
-    global.otpStore = global.otpStore || {};
-    global.otpStore[email] = { otp, expiry };
-
     return res.status(200).json({ message: "OTP sent successfully!" });
   } catch (err) {
     console.error("Error sending OTP:", err);
@@ -403,32 +398,29 @@ async function sendOTP(req, res) {
 
 async function verifyOTP(req, res) {
   try {
+    //validate input using zod
     const parsed = verifyOTPSchema.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({ errors: parsed.error.errors });
 
-    const { email, otp } = parsed.data;
+    let { email, otp } = parsed.data;
+    email=email.trim().toLowerCase()
     if (!email || !otp)
       return res.status(400).json({ message: "Email and OTP required" });
-
-
-    const record = global.otpStore?.[email];
-    if (!record)
-      return res.status(400).json({ message: "No OTP found for this email" });
-    if (Date.now() > record.expiry)
-      return res.status(400).json({ message: "OTP expired" });
-    if (record.otp !== otp)
-      return res.status(400).json({ message: "Invalid OTP" });
-    const user = await User.findOne({ email });
-    if (!user)
-      return res.status(404).json({ message: "User not found" });
-
-    await User.findByIdAndUpdate(user._id, {
+    //check otp using redis service
+    const result =await verifyOTPService(email,otp);
+    if(!result.valid){
+      return res.status(400).json({message:result.message})
+    }
+    //verify user in db
+    const user=await dbAdapter.findOne(User,{email});
+    if(!user){
+      return res.status(404).json({message:"user not found"})
+    }
+    //mark user as verified
+    await dbAdapter.findByIdAndUpdate(User,user._id, {
       isVerified: true,
-      otp: null,
-      otpExpiresAt: null,
     });
-    delete global.otpStore[email];
 
     return res.status(200).json({ message: "OTP verified successfully!" });
   } catch (err) {

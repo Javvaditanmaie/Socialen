@@ -1,15 +1,16 @@
-import mongoAdapter from "./mongoAdapter.js";
+import mongoAdapter from "./adapters/mongoAdapter.js";
+//import sqlAdapter from "./adapters/sqlAdapter.js";
 
-const dbAdapter = {
-  create: mongoAdapter.create,
-  findOne: mongoAdapter.findOne,
-  findById: mongoAdapter.findById,
-  find: mongoAdapter.find,
-  updateOne: mongoAdapter.updateOne,
-  findByIdAndUpdate: mongoAdapter.findByIdAndUpdate,
-  deleteOne: mongoAdapter.deleteOne,
-  deleteById: mongoAdapter.deleteById,
-  count: mongoAdapter.count,
-};
+const DB_TYPE = process.env.DB_TYPE || "mongo";
+
+let dbAdapter;
+
+if (DB_TYPE === "mongo") {
+  dbAdapter = mongoAdapter;
+} else if (DB_TYPE === "sql") {
+  dbAdapter = sqlAdapter;
+} else {
+  throw new Error(`Unknown DB_TYPE: ${DB_TYPE}`);
+}
 
 export default dbAdapter;

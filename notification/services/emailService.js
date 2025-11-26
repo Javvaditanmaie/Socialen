@@ -21,7 +21,7 @@ transporter.verify((err, success) => {
   }
 });
 
-export async function sendMail({ to, subject, text, html }) {
+async function sendMail({ to, subject, text, html }) {
   try {
     console.log("Sending email to:", to);
 
@@ -40,5 +40,5 @@ export async function sendMail({ to, subject, text, html }) {
     throw error;
   }
 }
-
-export { transporter };
+export default sendMail;
+export { transporter,sendMail};

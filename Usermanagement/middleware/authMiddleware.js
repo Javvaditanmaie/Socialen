@@ -31,7 +31,7 @@ const authenticate = (req, res, next) => {
       return res.status(401).json({ error: "Token missing" });
     }
 
-    console.log(" Received token:", token.slice(0, 25) + "...");
+    //console.log(" Received token:", token.slice(0, 25) + "...");
 
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = payload;

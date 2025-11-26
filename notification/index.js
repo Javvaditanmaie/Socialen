@@ -5,7 +5,7 @@ import http from "http";
 import { connect } from "./rabbitmq/connection.js";
 import { startConsumer } from "./rabbitmq/consumer.js";
 import { initSocket, getIO } from "./socket/socketServer.js";
-
+import emailRoutes from "./routes/email.routes.js"
 dotenv.config();
 
 const app = express();
@@ -13,7 +13,7 @@ const server = http.createServer(app);
 initSocket(server);
 
 app.use(express.json());
-
+app.use("/email",emailRoutes)
 app.post("/test-notif", (req, res) => {
   try {
     const io = getIO();
