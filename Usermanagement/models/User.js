@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-
+import { encryptField,decryptField,generateBlindIndex } from '../utils/cryptoUtils.js';
 const UserSchema = new mongoose.Schema(
   {
     name: {
@@ -10,16 +10,28 @@ const UserSchema = new mongoose.Schema(
       minlength: 2,
       maxlength: 100,
     },
-
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true, 
-      lowercase: true,
-      trim: true,
-      match: [/^\S+@\S+\.\S+$/, "Invalid email format"],
+    //encrypted email field
+    emailEnc:{
+      iv:{type:String,required:true},
+      authTag:{type:String,required:true},
+      encrypted:{type:String,required:true},
     },
+    //searchable blind index
+    emailBlindIndex:{
+      type:String,
+      required:true,
+      index:true,
+      unique:true,
+    },
+    // email: {
+    //   type: String,
+    //   required: true,
+    //   unique: true,
+    //   index: true, 
+    //   lowercase: true,
+    //   trim: true,
+    //   match: [/^\S+@\S+\.\S+$/, "Invalid email format"],
+    // },
 
     passwordHash: {
       type: String,
@@ -105,6 +117,27 @@ UserSchema.pre("save", async function (next) {
   this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
   next();
 });
+UserSchema.pre("save",function(next){
+  if(!this.isModified("emailEnc")&& this.emailEnc) return next();
+  if(!this.email) return next();
+  const encrypted= encryptField(this.email);
+  this.emailEnc=encrypted;
+  this.emailBlindIndex=generateBlindIndex(this.email);
+  next();
+})
+UserSchema.virtual("email").get(function(){
+  if(!this.emailEnc) return null;
+  try{
+    return decryptField(this.emailEnc);
+  }catch(err){
+    return null;
+  }
+})
+.set(function(value){
+  const encrypted=encryptField(value);
+  this.emailEnc=encrypted;
+  this.emailBlindIndex=generateBlindIndex(value);
+})
 
 UserSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.passwordHash);
@@ -114,5 +147,8 @@ UserSchema.methods.compareTotpSecret = async function (secret) {
   return await bcrypt.compare(secret, this.totpSecretHashed);
 };
 
+UserSchema.methods.getDecryptedEmail=function(){
+  return decryptField(this.emailEnc);
+}
 const User = mongoose.model("User", UserSchema);
 export default User;

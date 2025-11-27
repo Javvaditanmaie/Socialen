@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import dbAdapter from "../db/dbAdapter.js";
+import { generateBlindIndex } from "../utils/cryptoUtils.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
@@ -34,16 +35,17 @@ export async function registerUser({
   createdBy,
 }) {
   email = email.toLowerCase().trim();
-
-  // Check if user exists
-  const existing = await dbAdapter.findOne(User, { email });
+  //create blind index for search
+  const blindIndex=generateBlindIndex(email);
+  // Check if user exists using blind index
+  const existing = await dbAdapter.findOne(User, { emailBlindIndex:blindIndex });
   if (existing) throw { status: 400, message: "Email already registered" };
 
   if (!mfaMethod || !["otp", "totp"].includes(mfaMethod)) {
     throw { status: 400, message: "mfaMethod must be 'otp' or 'totp'" };
   }
 
-  // Create user
+  // Create user object
   const userObj = {
     name,
     email,
@@ -53,8 +55,10 @@ export async function registerUser({
     mfaMethod,
     createdBy: createdBy || null,
     isVerified: false,
+    //setting email field triggers auto-encryption
+    email:email,
   };
-
+  //save auto encrypts email+sets blindIndex
   const userDoc = await dbAdapter.create(User, userObj);
 
   const safeUser = {
@@ -74,29 +78,33 @@ export async function registerUser({
 // --------------------------------------------------
 export async function loginUser({ email, password }) {
   email = email.toLowerCase().trim();
-
+  //generate blind index to search encrypted email
+  const blindIndex=generateBlindIndex(email);
+  //find encrypted user via searchable blind index
   const user = await dbAdapter.findOne(
     User,
-    { email },
+    { emailBlindIndex:blindIndex },
     "+passwordHash +refreshToken +totpSecretHashed"
   );
 
   if (!user) throw { status: 400, message: "Invalid credentials" };
+  //check verification
   if (!user.isVerified) throw { status: 403, message: "Verify account first." };
-
+  //check password
   const validPassword = await bcrypt.compare(password, user.passwordHash);
   if (!validPassword) throw { status: 400, message: "Invalid credentials" };
-
+  //prepare JWT payload (Email will be decrypted automatically)
   const payload = {
     sub: user._id.toString(),
     role: user.role,
     organizationId: user.organizationId?.toString() || null,
-    email: user.email,
+    email: user.email,//decrypted virtual getter
   };
 
+  // generate tokens
   const accessToken = signAccessToken(payload);
   const refreshTokenPlain = signRefreshToken({ sub: user._id.toString() });
-
+  // hash refresh token and update using adapter
   const refreshHash = await bcrypt.hash(refreshTokenPlain, 12);
 
   // Update user refresh token using adapter
@@ -109,10 +117,10 @@ export async function loginUser({ email, password }) {
     },
     { new: true }
   );
-
+  // user object returned to frontend
   const safeUser = {
     id: user._id.toString(),
-    email: user.email,
+    email: user.email,// decrypted email
     name: user.name,
     role: user.role,
     organizationId: user.organizationId,

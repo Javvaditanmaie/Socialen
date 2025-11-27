@@ -109,13 +109,16 @@ async function signin(req, res) {
     const parsed = signinSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
     const { email, password,otp } = parsed.data;
+    email=email.toLowerCase().trim();
+    //Blind index lookup
+    const blindIndex=generateBlindIndex(email);
     if (!email || !password)
       return res.status(400).json({ error: "Email and password required" });
-
-    const user = await dbAdapter.findOne(User,{ email }, "+passwordHash +totpSecret");
+    //fetch encrypted user
+    const user = await dbAdapter.findOne(User,{ emailBlindIndex:blindIndex }, "+passwordHash +totpSecret");
 
     if (!user) return res.status(400).json({ error: "Invalid credentials" });
-
+    // if TOTP enabled-> verify
     if (user.totpEnabled) {
       if (!otp) return res.status(400).json({ error: "TOTP required" });
 
@@ -127,9 +130,9 @@ async function signin(req, res) {
 
       if (!verified) return res.status(400).json({ error: "Invalid TOTP code" });
     }
-
+    // normal user/password login continues in sevice
     const result = await authService.loginUser({ email, password });
-
+    // set refresh token cookie
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
       sameSite: "strict",
@@ -148,8 +151,9 @@ async function signin(req, res) {
 async function loginTOTP(req, res) {
   try {
     const { email, code } = req.body;
-
-    const user = await dbAdapter.findOne(User,{ email }, "+refreshToken +totpSecret");
+    //generate blind index
+    const blindIndex=generateBlindIndex(email);
+    const user = await dbAdapter.findOne(User,{ emailBlindIndex:blindIndex }, "+refreshToken +totpSecret");
     if (!user || !user.totpSecret)
       return res.status(400).json({ error: "TOTP not set up for this user" });
 
@@ -163,30 +167,35 @@ async function loginTOTP(req, res) {
     if (!verified)
       return res.status(400).json({ error: "Invalid or expired TOTP code" });
 
-    
+    // prepare JWT payload decrtpted email automatically
     const accessToken = jwt.sign(
       {
         sub: user._id.toString(),
         role: user.role,
-        email: user.email,
+        email: user.email,// decrypted virtual
         organizationId: user.organizationId || null,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
-    
+    // refresh token generation
     const refreshToken = jwt.sign(
       { sub: user._id.toString() },
       process.env.REFRESH_TOKEN_SECRET,
       { expiresIn: "30d" }
     );
 
-  
+    //store hashed refresh token
     user.refreshToken = await bcrypt.hash(refreshToken, 12);
-    await user.save();
+    await dbAdapter.findByIdAndUpdate(
+      User,
+      user._id,
+      { refreshToken: hashedRT },
+      { new: true }
+    );
 
-    res.json({
+    return res.json({
       message: "TOTP verified successfully",
       accessToken,
       refreshToken,
