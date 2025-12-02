@@ -12,6 +12,7 @@ import Organization from "../models/Organization.js";
 import crypto from "crypto";
 import amqp from "amqplib";
 import axios from "axios"
+import logger from "../utils/logger.js"
 import {
   signupSchema,
   signinSchema,
@@ -20,6 +21,7 @@ import {
   totpSetupSchema,
   validateInvitationSchema,
 } from "../validators/authValidator.js";
+import { generateBlindIndex } from "../utils/cryptoUtils.js";
 
 async function signup(req, res) {
   try {
@@ -214,9 +216,10 @@ async function totpSetup(req, res) {
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
 
     const { email } = parsed.data;
+    const blindIndex=generateBlindIndex(email)
     if (!email) return res.status(400).json({ error: "Email is required." });
 
-    const user = await dbAdapter.findOne(User,{ email });
+    const user = await dbAdapter.findOne(User,{ email_idx:blindIndex});
     if (!user) return res.status(404).json({ error: "User not found." });
 
     if (user.mfaMethod !== "totp")
@@ -225,7 +228,7 @@ async function totpSetup(req, res) {
     let secret;
     // Only generate a new secret if one doesn't already exist
     if (!user.totpSecret) {
-      secret = speakeasy.generateSecret({ name: `MyApp (${email})` });
+      secret = speakeasy.generateSecret({ name: `Socialen (${email})` });
       user.totpSecret = secret.base32;
       await user.save();
     } else {
@@ -233,7 +236,7 @@ async function totpSetup(req, res) {
       secret = { base32: user.totpSecret };
     }
 
-    const otpauthUrl = `otpauth://totp/MyApp:${email}?secret=${secret.base32}&issuer=MyApp`;
+    const otpauthUrl = `otpauth://totp/Socialen:${email}?secret=${secret.base32}&issuer=Socialen`;
     const qrCodeUrl = await qrcode.toDataURL(otpauthUrl);
 
     res.status(200).json({
@@ -251,11 +254,12 @@ async function totpSetup(req, res) {
 async function verifyTotp(req, res) {
   try {
     const { email, code } = req.body;
+    const blindIndex=generateBlindIndex(email);
     if (!email || !code) {
       return res.status(400).json({ error: "Email and code are required" });
     }
 
-    const user = await dbAdapter.findOne(User,{ email });
+    const user = await dbAdapter.findOne(User,{ email_idx:blindIndex });
     if (!user || !user.totpSecret) {
       return res.status(404).json({ error: "User or TOTP secret not found" });
     }
@@ -421,8 +425,9 @@ async function verifyOTP(req, res) {
     if(!result.valid){
       return res.status(400).json({message:result.message})
     }
+    const blindIndex=generateBlindIndex(email);
     //verify user in db
-    const user=await dbAdapter.findOne(User,{email});
+    const user=await dbAdapter.findOne(User,{email_idx:blindIndex});
     if(!user){
       return res.status(404).json({message:"user not found"})
     }
@@ -430,7 +435,6 @@ async function verifyOTP(req, res) {
     await dbAdapter.findByIdAndUpdate(User,user._id, {
       isVerified: true,
     });
-
     return res.status(200).json({ message: "OTP verified successfully!" });
   } catch (err) {
     console.error("Error verifying OTP:", err);

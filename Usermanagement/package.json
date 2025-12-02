@@ -38,6 +38,8 @@
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "uuid": "^13.0.0",
+    "winston": "^3.18.3",
+    "winston-mongodb": "^7.0.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {

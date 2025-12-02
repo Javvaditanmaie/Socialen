@@ -11,3 +11,10 @@ export const FIELD_ENC_KEY=fs
 export const BLIND_IDX_KEY = fs
   .readFileSync(path.join(basePath, "blind_idx_key.hex"), "utf8")
   .trim();
+if (FIELD_ENC_KEY.length !== 64) {
+  throw new Error("FIELD_ENC_KEY must be 32-byte hex (64 characters)");
+}
+
+if (BLIND_IDX_KEY.length !== 64) {
+  throw new Error("BLIND_IDX_KEY must be 32-byte hex (64 characters)");
+}

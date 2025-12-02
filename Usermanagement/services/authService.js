@@ -38,7 +38,7 @@ export async function registerUser({
   //create blind index for search
   const blindIndex=generateBlindIndex(email);
   // Check if user exists using blind index
-  const existing = await dbAdapter.findOne(User, { emailBlindIndex:blindIndex });
+  const existing = await dbAdapter.findOne(User, { email_idx:blindIndex });
   if (existing) throw { status: 400, message: "Email already registered" };
 
   if (!mfaMethod || !["otp", "totp"].includes(mfaMethod)) {
@@ -56,7 +56,7 @@ export async function registerUser({
     createdBy: createdBy || null,
     isVerified: false,
     //setting email field triggers auto-encryption
-    email:email,
+    //email:email,
   };
   //save auto encrypts email+sets blindIndex
   const userDoc = await dbAdapter.create(User, userObj);
@@ -83,7 +83,7 @@ export async function loginUser({ email, password }) {
   //find encrypted user via searchable blind index
   const user = await dbAdapter.findOne(
     User,
-    { emailBlindIndex:blindIndex },
+    { email_idx:blindIndex },
     "+passwordHash +refreshToken +totpSecretHashed"
   );
 
