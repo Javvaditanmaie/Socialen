@@ -26,7 +26,11 @@ import { generateBlindIndex } from "../utils/cryptoUtils.js";
 async function signup(req, res) {
   try {
     const parsed = signupSchema.safeParse(req.body);
-    if (!parsed.success) {
+      if (!parsed.success) {
+      logger.warn("Signup validation failed", {
+        service: "auth-service",
+        errors: parsed.error.errors
+      });
       return res.status(400).json({ errors: parsed.error.errors });
     }
 
@@ -42,6 +46,11 @@ async function signup(req, res) {
     } = parsed.data;
 
     if (invitationId && code) {
+       logger.info("Processing invitation signup", {
+        invitationId,
+        email,
+        service: "auth-service"
+      });
       const inv = await invitationService.validateInvitation(invitationId, code);
       const orgId = inv.organizationId || null;
       const user = await authService.registerUser({
@@ -58,7 +67,16 @@ async function signup(req, res) {
       inv.acceptedAt = new Date();
       inv.acceptedUserId = user.id || user._id;
       await inv.save();
-
+      logger.info("invitation signup successful",{
+        email:inv.email,
+        userId:user._id,
+        service:"auth-service",
+      })
+      logger.error("signup failed",{
+        message:err.message,
+        service:"auth-service",
+        stack:err.stack
+      })
       const requiresMfaSetup = user.mfaMethod === 'totp' || user.mfaMethod === 'otp';
       return res.status(201).json({
         message: `User registered successfully via invitation. Please set up ${inv.method.toUpperCase()}.`,
@@ -66,6 +84,9 @@ async function signup(req, res) {
       });
     }
     if (!name || !email || !password || !role || !mfaMethod) {
+      logger.warn("Missing required signup fields", {
+        service: "auth-service"
+      });
       return res.status(400).json({ error: "Name, email, password, role, and mfaMethod are required" });
     }
     let organizationId = null;
@@ -102,7 +123,12 @@ async function signup(req, res) {
     
   } catch (err) {
     console.error("Signup Error:", err);
-    res.status(500).json({ error: err.message || "Server error" });
+    logger.error("signup error occurred",{
+      message:err.message,
+      service:"auth-service",
+      stack:err.stack
+    })
+     return res.status(500).json({ error: err.message || "Server error" });
   }
 }
 async function signin(req, res) {

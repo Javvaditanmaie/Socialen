@@ -1,0 +1,17 @@
+{"level":"error","message":"","timestamp":"2025-12-12T09:29:50.973Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-12T09:29:58.557Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:27:49.850Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:32:59.803Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:34:39.806Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:34:42.907Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:34:49.406Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:34:52.244Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:34:57.790Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:35:00.407Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:35:10.721Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:35:16.718Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:35:19.769Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:35:24.343Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:35:29.871Z"}
+{"level":"error","message":"test error log","timestamp":"2025-12-15T05:35:38.383Z"}
+{"level":"error","message":"signup error occurred Email already registered","service":"auth-service","timestamp":"2025-12-15T06:17:17.024Z"}

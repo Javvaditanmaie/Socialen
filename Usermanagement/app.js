@@ -9,7 +9,6 @@ import userRoutes from "./routes/userRoutes.js";
 import {initSocket} from "./socket/socketServer.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import { connectRabbitMQ } from "./utils/rabbitmq.js";
-
 const app = express();
 const server=http.createServer(app);
 initSocket(server);
